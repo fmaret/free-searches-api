@@ -1,0 +1,6 @@
+logging:
+  config:
+    path: ${APP_PATH}/default_logging.ini
+tor:
+  host: ${PROXY_HOST}
+  port: ${PROXY_PORT}
