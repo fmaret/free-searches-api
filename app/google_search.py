@@ -1,3 +1,4 @@
+from pprint import pprint
 from bs4 import BeautifulSoup
 import requests
 import unidecode
@@ -61,29 +62,98 @@ def get_menu_items(soup: BeautifulSoup, gl="fr"):
 
 def get_knowledge_graph(soup: BeautifulSoup):
     graph = soup.find(class_="osrp-blk")
-    title = graph.find("h2").text
-    site = graph.find(class_="ab_button")["href"] if graph.find(class_="ab_button") else None
-    rating_line = graph.find("div", {"data-attrid": "kc:/collection/knowledge_panels/local_reviewable:star_score"})
-    rating = rating_line.find("div", recursive=False).find("div", recursive=False).find("span", recursive=False).text
-    total_reviews = rating_line.find("a").find("span").text
-    infos = soup.find(id="kp-wp-tab-overview").find("div").find("div").find("div").find("div").find("div").find("div").find_all("div", recursive=False)
+    if not graph:
+        return None
+    infos = graph.find_all({"div", "h2"}, {"data-attrid": True})
+    pprint(infos)
     output = {}
+    print([info["data-attrid"] for info in infos])
+    images = []
+    data = []
+    debug = {}
+    if graph.find(class_="ab_button"):
+        output["website"] = graph.find(class_="ab_button")["href"]
     for info in infos:
-        try:
+        id = info["data-attrid"]
+        if id in ["image", "secondary image"]:
+            images.append({
+                "link": info.find("a")["href"],
+                "source": info["data-lpage"]
+            })
+        elif id == "title":
+            output["title"] = info.text
+        elif id == "description":
+            output["description"] = {
+                "text": info.find("span").text,
+                "source": info.find("a")["href"] if info.find("a") else None
+            }
+        elif id == "kc:/local:one line summary":
+            output["oneLineSummary"] = info.text
+        elif id == "kc:/local:located in":
+            output["situation"] = {
+                "name": info.find("a").text,
+                "url": info.find("a")["href"]
+            }
+        elif id == "kc:/location/location:address":
             spans = info.find_all("span")
-            if len(spans) != 1:
-                output[spans[0].text] = spans[1].text
-            else:
-                output[spans[0].text] = info.find("a").text
-        except:
-            pass
-    output.update({
-        "title": title,
-        "headerImages": [],
-        "website": site,
-        "rating": rating,
-        "totalReviews": total_reviews
-    })
+            output["address"] = {
+                "address": spans[-1].text,
+                "url": spans[0].find("a")["href"]
+            }
+        elif id == "kc:/location/location:hours":
+            spans = info.find_all("span")
+            output["hours"] = {
+                "devNote": "WIP",
+                "hours": spans[-1].text,
+                "url": spans[0].find("a")["href"]
+            }
+        elif id == "kc:/collection/knowledge_panels/has_phone:phone":
+            spans = info.find_all("span")
+            output["phone"] = {
+                "phone": spans[-1].text,
+                "url": spans[0].find("a")["href"]
+            }
+        elif id == "kc:/collection/knowledge_panels/local_reviewable:star_score":
+            output["rating"] = info.find("div", recursive=False).find("div", recursive=False).find("span", recursive=False).text
+            output["totalReviews"] = info.find("a").find("span").text
+        elif ":/" in id:
+            try:
+                spans = info.find_all("span")
+                debug[":".join(spans[0].text.split(":")[:-1]).strip()] = spans[1].text
+            except:
+                print("error with "+ id)
+    if images:
+        output["inlineImages"] = images
+    output["debug"] = debug
+    # title = graph.find("h2").text
+    # site = graph.find(class_="ab_button")["href"] if graph.find(class_="ab_button") else None
+    # try:
+    #     rating_line = graph.find("div", {"data-attrid": "kc:/collection/knowledge_panels/local_reviewable:star_score"})
+    #     rating = rating_line.find("div", recursive=False).find("div", recursive=False).find("span", recursive=False).text
+    #     total_reviews = rating_line.find("a").find("span").text
+    # except:
+    #     rating = None
+    #     total_reviews = None
+    # infos = soup.find(id="kp-wp-tab-overview").find("div").find("div").find("div").find("div").find("div").find("div").find_all("div", recursive=False)
+    # print([info for info in infos])
+    # output = {}
+    # for info in infos:
+    #     try:
+    #         spans = info.find_all("span")
+    #         if len(spans) != 1:
+    #             output[spans[0].text] = spans[1].text
+    #         else:
+    #             output[spans[0].text] = info.find("a").text
+    #     except:
+    #         pass
+    # output.update({
+    #     "title": title,
+    #     "headerImages": [],
+    #     "website": site,
+    #     "rating": rating,
+    #     "totalReviews": total_reviews
+    # })
+
     return output
 
 
